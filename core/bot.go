@@ -19,8 +19,14 @@ type BotAPI interface {
 	SendPhoto(ctx context.Context, chatID int64, photo interface{}, caption string, replyMarkup interface{}) error
 	SendDocument(ctx context.Context, chatID int64, document interface{}, caption string, replyMarkup interface{}) error
 	EditMessageText(ctx context.Context, chatID int64, messageID int, text string, replyMarkup interface{}) error
+	EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int, replyMarkup interface{}) error
 	AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error
 	ForwardMessage(ctx context.Context, chatID int64, fromChatID int64, messageID int) error
+	GetChat(ctx context.Context, chatID int64) (Chat, error)
+	GetChatMembersCount(ctx context.Context, chatID int64) (int, error)
+	GetChatAdministrators(ctx context.Context, chatID int64) ([]Chat, error)
+	GetMe(ctx context.Context) (User, error)
+	// Другие методы можно добавить при необходимости.
 }
 
 // botClient – реализация интерфейса BotAPI.
@@ -288,6 +294,56 @@ func (b *botClient) EditMessageText(ctx context.Context, chatID int64, messageID
 	return nil
 }
 
+// EditMessageReplyMarkup обновляет reply_markup для сообщения.
+func (b *botClient) EditMessageReplyMarkup(ctx context.Context, chatID int64, messageID int, replyMarkup interface{}) error {
+	endpoint := fmt.Sprintf("%s/editMessageReplyMarkup", b.apiURL)
+	payload := map[string]interface{}{
+		"chat_id":     chatID,
+		"message_id":  messageID,
+		"reply_markup": replyMarkup,
+	}
+
+	body, err := json.Marshal(payload)
+	if err != nil {
+		b.logger.Error("Failed to marshal editMessageReplyMarkup payload", core.Field{"error", err})
+		return err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
+	if err != nil {
+		b.logger.Error("Failed to create editMessageReplyMarkup request", core.Field{"error", err})
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	var resp *http.Response
+	core.WithRecovery(b.logger, func() {
+		resp, err = b.httpClient.Do(req)
+	})
+	if err != nil {
+		b.logger.Error("Error executing editMessageReplyMarkup request", core.Field{"error", err})
+		return err
+	}
+	defer resp.Body.Close()
+
+	respBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		b.logger.Error("Error reading editMessageReplyMarkup response", core.Field{"error", err})
+		return err
+	}
+	if resp.StatusCode != http.StatusOK {
+		b.logger.Error("Non-OK response from editMessageReplyMarkup",
+			core.Field{"status", resp.Status},
+			core.Field{"body", string(respBody)},
+		)
+		return fmt.Errorf("editMessageReplyMarkup failed with status: %s", resp.Status)
+	}
+
+	b.logger.Info("Message reply markup edited successfully", core.Field{"chat_id", chatID}, core.Field{"message_id", messageID})
+	return nil
+}
+
+
 // AnswerCallbackQuery отвечает на callback-запрос.
 func (b *botClient) AnswerCallbackQuery(ctx context.Context, callbackQueryID string, text string, showAlert bool) error {
 	endpoint := fmt.Sprintf("%s/answerCallbackQuery", b.apiURL)
@@ -360,4 +416,159 @@ func (b *botClient) ForwardMessage(ctx context.Context, chatID int64, fromChatID
 	}
 	b.logger.Info("Message forwarded successfully", Field{"chat_id", chatID}, Field{"from_chat_id", fromChatID}, Field{"message_id", messageID})
 	return nil
+}
+
+// Пример реализации метода GetChat.
+func (b *botClient) GetChat(ctx context.Context, chatID int64) (Chat, error) {
+	endpoint := fmt.Sprintf("%s/getChat?chat_id=%d", b.apiURL, chatID)
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		b.logger.Error("Failed to create getChat request", Field{"error", err})
+		return Chat{}, err
+	}
+	var resp *http.Response
+	WithRecovery(b.logger, func() {
+		resp, err = b.httpClient.Do(req)
+	})
+	if err != nil {
+		b.logger.Error("Error executing getChat request", Field{"error", err})
+		return Chat{}, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		b.logger.Error("Error reading getChat response", Field{"error", err})
+		return Chat{}, err
+	}
+	var result struct {
+		OK     bool `json:"ok"`
+		Result Chat `json:"result"`
+	}
+	if err = json.Unmarshal(bodyBytes, &result); err != nil {
+		b.logger.Error("Error unmarshalling getChat response", Field{"error", err})
+		return Chat{}, err
+	}
+	if !result.OK {
+		b.logger.Error("Telegram API returned not OK for getChat", Field{"response", string(bodyBytes)})
+		return Chat{}, fmt.Errorf("getChat failed with response: %s", string(bodyBytes))
+	}
+	b.logger.Info("Chat retrieved successfully", Field{"chat_id", chatID})
+	return result.Result, nil
+}
+
+// Пример реализации метода GetChatMembersCount.
+func (b *botClient) GetChatMembersCount(ctx context.Context, chatID int64) (int, error) {
+	endpoint := fmt.Sprintf("%s/getChatMembersCount?chat_id=%d", b.apiURL, chatID)
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		b.logger.Error("Failed to create getChatMembersCount request", Field{"error", err})
+		return 0, err
+	}
+	var resp *http.Response
+	WithRecovery(b.logger, func() {
+		resp, err = b.httpClient.Do(req)
+	})
+	if err != nil {
+		b.logger.Error("Error executing getChatMembersCount request", Field{"error", err})
+		return 0, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		b.logger.Error("Error reading getChatMembersCount response", Field{"error", err})
+		return 0, err
+	}
+	var result struct {
+		OK     bool `json:"ok"`
+		Result int  `json:"result"`
+	}
+	if err = json.Unmarshal(bodyBytes, &result); err != nil {
+		b.logger.Error("Error unmarshalling getChatMembersCount response", Field{"error", err})
+		return 0, err
+	}
+	if !result.OK {
+		b.logger.Error("Telegram API returned not OK for getChatMembersCount", Field{"response", string(bodyBytes)})
+		return 0, fmt.Errorf("getChatMembersCount failed with response: %s", string(bodyBytes))
+	}
+	b.logger.Info("Chat members count retrieved", Field{"chat_id", chatID}, Field{"count", result.Result})
+	return result.Result, nil
+}
+
+// Пример реализации метода GetChatAdministrators.
+func (b *botClient) GetChatAdministrators(ctx context.Context, chatID int64) ([]Chat, error) {
+	endpoint := fmt.Sprintf("%s/getChatAdministrators?chat_id=%d", b.apiURL, chatID)
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		b.logger.Error("Failed to create getChatAdministrators request", Field{"error", err})
+		return nil, err
+	}
+	var resp *http.Response
+	WithRecovery(b.logger, func() {
+		resp, err = b.httpClient.Do(req)
+	})
+	if err != nil {
+		b.logger.Error("Error executing getChatAdministrators request", Field{"error", err})
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		b.logger.Error("Error reading getChatAdministrators response", Field{"error", err})
+		return nil, err
+	}
+	var result struct {
+		OK     bool   `json:"ok"`
+		Result []Chat `json:"result"`
+	}
+	if err = json.Unmarshal(bodyBytes, &result); err != nil {
+		b.logger.Error("Error unmarshalling getChatAdministrators response", Field{"error", err})
+		return nil, err
+	}
+	if !result.OK {
+		b.logger.Error("Telegram API returned not OK for getChatAdministrators", Field{"response", string(bodyBytes)})
+		return nil, fmt.Errorf("getChatAdministrators failed with response: %s", string(bodyBytes))
+	}
+	b.logger.Info("Chat administrators retrieved", Field{"chat_id", chatID}, Field{"count", len(result.Result)})
+	return result.Result, nil
+}
+
+func (b *botClient) GetMe(ctx context.Context) (User, error) {
+	endpoint := fmt.Sprintf("%s/getMe", b.apiURL)
+	req, err := http.NewRequestWithContext(ctx, "GET", endpoint, nil)
+	if err != nil {
+		b.logger.Error("Failed to create getMe request", Field{"error", err})
+		return User{}, err
+	}
+	var resp *http.Response
+	WithRecovery(b.logger, func() {
+		resp, err = b.httpClient.Do(req)
+	})
+	if err != nil {
+		b.logger.Error("Error executing getMe request", Field{"error", err})
+		return User{}, err
+	}
+	defer resp.Body.Close()
+
+	bodyBytes, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		b.logger.Error("Error reading getMe response", Field{"error", err})
+		return User{}, err
+	}
+	var result struct {
+		OK     bool `json:"ok"`
+		Result User `json:"result"`
+	}
+	if err = json.Unmarshal(bodyBytes, &result); err != nil {
+		b.logger.Error("Error unmarshalling getMe response", Field{"error", err})
+		return User{}, err
+	}
+	if !result.OK {
+		b.logger.Error("Telegram API returned not OK for getMe", Field{"response", string(bodyBytes)})
+		return User{}, fmt.Errorf("getMe failed with response: %s", string(bodyBytes))
+	}
+	b.logger.Info("GetMe executed successfully")
+	return result.Result, nil
 }
