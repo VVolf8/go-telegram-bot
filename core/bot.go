@@ -317,7 +317,7 @@ func (b *botClient) EditMessageReplyMarkup(ctx context.Context, chatID int64, me
 	req.Header.Set("Content-Type", "application/json")
 
 	var resp *http.Response
-	core.WithRecovery(b.logger, func() {
+	WithRecovery(b.logger, func() {
 		resp, err = b.httpClient.Do(req)
 	})
 	if err != nil {
