@@ -111,3 +111,121 @@ func TestAnswerPreCheckoutQuery(t *testing.T) {
 		t.Errorf("AnswerPreCheckoutQuery returned error: %v", err)
 	}
 }
+
+// dummyLogger реализует интерфейс core.Logger для тестирования.
+type dummyLogger struct {
+	logs []string
+}
+
+func (d *dummyLogger) Debug(msg string, fields ...core.Field) {
+	d.logs = append(d.logs, "DEBUG: "+msg)
+}
+
+func (d *dummyLogger) Info(msg string, fields ...core.Field) {
+	d.logs = append(d.logs, "INFO: "+msg)
+}
+
+func (d *dummyLogger) Warn(msg string, fields ...core.Field) {
+	d.logs = append(d.logs, "WARN: "+msg)
+}
+
+func (d *dummyLogger) Error(msg string, fields ...core.Field) {
+	d.logs = append(d.logs, "ERROR: "+msg)
+}
+
+func (d *dummyLogger) Fatal(msg string, fields ...core.Field) {
+	// В тестах не вызываем os.Exit, поэтому просто логгируем Fatal-сообщение.
+	d.logs = append(d.logs, "FATAL: "+msg)
+}
+
+func (d *dummyLogger) WithFields(fields ...core.Field) core.Logger {
+	// Для целей тестирования можно вернуть тот же логгер,
+	// либо создать новый с добавлением полей (при необходимости).
+	return d
+}
+
+func TestHandleSuccessfulPayment(t *testing.T) {
+	logger := &dummyLogger{}
+	ps := NewPaymentService("test_token", logger, &http.Client{})
+
+	// Создаём тестовый update (используем core.Update как структуру).
+	update := core.Update{
+		UpdateID: 12345,
+		// Другие поля можно заполнить по необходимости.
+	}
+
+	ctx := context.Background()
+	err := ps.HandleSuccessfulPayment(ctx, update)
+	if err != nil {
+		t.Errorf("HandleSuccessfulPayment вернул ошибку: %v", err)
+	}
+
+	if len(logger.logs) == 0 {
+		t.Error("Логгер не записал ни одного сообщения")
+	}
+}
+
+func TestProcessRefund(t *testing.T) {
+	logger := &dummyLogger{}
+	ps := NewPaymentService("test_token", logger, &http.Client{})
+	ctx := context.Background()
+
+	paymentID := "refund_test_id"
+	err := ps.ProcessRefund(ctx, paymentID)
+	if err != nil {
+		t.Errorf("ProcessRefund вернул ошибку для валидного paymentID: %v", err)
+	}
+
+	// Проверяем, что в логах присутствует сообщение о начале обработки возврата.
+	found := false
+	for _, msg := range logger.logs {
+		if msg == "INFO: Processing refund" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Log("Обработка возврата не отразилась в логах (возможно, логирование изменилось)")
+	}
+}
+
+func TestGenerateReceipt(t *testing.T) {
+	logger := &dummyLogger{}
+	ps := NewPaymentService("test_token", logger, &http.Client{})
+	ctx := context.Background()
+
+	paymentID := "receipt_test_id"
+	receiptStr, err := ps.GenerateReceipt(ctx, paymentID)
+	if err != nil {
+		t.Errorf("GenerateReceipt вернул ошибку: %v", err)
+	}
+
+	if receiptStr == "" {
+		t.Error("GenerateReceipt вернул пустую квитанцию")
+	}
+
+	// Проверяем, что результат является корректным JSON-объектом с необходимыми полями.
+	var receiptData map[string]interface{}
+	if err := json.Unmarshal([]byte(receiptStr), &receiptData); err != nil {
+		t.Errorf("Сгенерированная квитанция не является корректным JSON: %v", err)
+	}
+
+	// Проверяем наличие payment_id.
+	if id, ok := receiptData["payment_id"]; !ok || id != paymentID {
+		t.Errorf("В квитанции отсутствует корректный payment_id, ожидается %s, получено %v", paymentID, id)
+	}
+
+	// Проверяем статус.
+	if status, ok := receiptData["status"]; !ok || status != "success" {
+		t.Errorf("В квитанции отсутствует корректный статус, ожидается \"success\", получено %v", status)
+	}
+
+	// Проверяем наличие и корректность timestamp.
+	if ts, ok := receiptData["timestamp"]; !ok {
+		t.Error("В квитанции отсутствует timestamp")
+	} else {
+		if _, err := time.Parse(time.RFC3339, ts.(string)); err != nil {
+			t.Errorf("timestamp имеет неверный формат: %v", err)
+		}
+	}
+}

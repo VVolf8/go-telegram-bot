@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-        "time"
+	"time"
 
 	"github.com/VVolf8/go-telegram-bot/core"
 )
@@ -28,31 +28,22 @@ type Invoice struct {
 	StartParameter string  `json:"start_parameter"`
 	Currency       string  `json:"currency"`
 	Prices         []Price `json:"prices"`
-	// Можно добавить дополнительные опциональные поля по необходимости.
+	// Additional optional fields can be added if needed.
 }
 
 // PaymentService defines the interface for payment-related methods.
 type PaymentService interface {
-	// Existing methods
+	// SendInvoice sends an invoice to a chat.
 	SendInvoice(ctx context.Context, invoice Invoice) error
+	// AnswerShippingQuery responds to a shipping query.
 	AnswerShippingQuery(ctx context.Context, shippingQueryID string, ok bool, errorMessage string) error
+	// AnswerPreCheckoutQuery responds to a pre-checkout query.
 	AnswerPreCheckoutQuery(ctx context.Context, preCheckoutQueryID string, ok bool, errorMessage string) error
-
-	// New methods for extended functionality:
+	// HandleSuccessfulPayment processes a successful payment update.
 	HandleSuccessfulPayment(ctx context.Context, update core.Update) error
+	// ProcessRefund processes a refund for a payment.
 	ProcessRefund(ctx context.Context, paymentID string) error
-	GenerateReceipt(ctx context.Context, paymentID string) (string, error)
-}
-
-
-// PaymentServiceExtended расширяет базовый PaymentService дополнительными методами.
-type PaymentServiceExtended interface {
-	PaymentService
-	// HandleSuccessfulPayment обрабатывает обновление об успешной оплате.
-	HandleSuccessfulPayment(ctx context.Context, update core.Update) error
-	// ProcessRefund обрабатывает возврат платежа.
-	ProcessRefund(ctx context.Context, paymentID string) error
-	// GenerateReceipt генерирует квитанцию для платежа.
+	// GenerateReceipt generates a receipt for a payment.
 	GenerateReceipt(ctx context.Context, paymentID string) (string, error)
 }
 
@@ -80,7 +71,6 @@ func NewPaymentService(token string, logger core.Logger, httpClient *http.Client
 // SendInvoice sends an invoice via Telegram.
 func (ps *paymentService) SendInvoice(ctx context.Context, invoice Invoice) error {
 	endpoint := fmt.Sprintf("%s/sendInvoice", ps.apiURL)
-	// Создаем JSON-пейлоад на основе структуры Invoice.
 	payloadBytes, err := json.Marshal(invoice)
 	if err != nil {
 		ps.logger.Error("Failed to marshal SendInvoice payload", core.Field{"error", err})
@@ -221,14 +211,9 @@ func (ps *paymentService) AnswerPreCheckoutQuery(ctx context.Context, preCheckou
 	return nil
 }
 
-// HandleSuccessfulPayment обрабатывает обновление об успешной оплате.
-// Обычно Telegram отправляет обновление, содержащее информацию об успешной оплате.
-// Здесь можно, например, логировать событие и выполнять дополнительные действия (уведомлять, сохранять данные и т.д.).
+// HandleSuccessfulPayment processes a successful payment update.
 func (ps *paymentService) HandleSuccessfulPayment(ctx context.Context, update core.Update) error {
-	// Пример: логируем успешную оплату. 
-	// Для реальной обработки нужно извлечь необходимые данные из update (например, через update.Message или специальное поле).
 	ps.logger.Info("Payment processed successfully", core.Field{"update_id", update.UpdateID})
-	// Здесь можно вызвать GenerateReceipt и, например, отправить квитанцию пользователю.
 	receipt, err := ps.GenerateReceipt(ctx, "payment_id_example")
 	if err != nil {
 		ps.logger.Error("Error generating receipt", core.Field{"error", err})
@@ -238,19 +223,15 @@ func (ps *paymentService) HandleSuccessfulPayment(ctx context.Context, update co
 	return nil
 }
 
-// ProcessRefund обрабатывает возврат платежа.
-// Здесь можно реализовать логику взаимодействия с платежным провайдером для проведения возврата.
+// ProcessRefund processes a refund for a given payment ID.
 func (ps *paymentService) ProcessRefund(ctx context.Context, paymentID string) error {
-	// Пример: логируем запрос на возврат и возвращаем ошибку, если что-то пошло не так.
 	ps.logger.Info("Processing refund", core.Field{"payment_id", paymentID})
-	// Здесь должна быть реальная логика работы с API платежного провайдера.
-	// Для примера возвращаем nil.
+	// Implement refund logic with the payment provider's API.
 	return nil
 }
 
-// GenerateReceipt генерирует квитанцию для платежа и возвращает строковое представление квитанции.
+// GenerateReceipt generates a receipt for a given payment ID.
 func (ps *paymentService) GenerateReceipt(ctx context.Context, paymentID string) (string, error) {
-	// Пример: генерация квитанции (например, в виде JSON или строки).
 	receiptData := map[string]interface{}{
 		"payment_id": paymentID,
 		"status":     "success",
@@ -265,33 +246,3 @@ func (ps *paymentService) GenerateReceipt(ctx context.Context, paymentID string)
 	ps.logger.Info("Receipt generated successfully", core.Field{"payment_id", paymentID})
 	return receipt, nil
 }
-
-// HandleSuccessfulPayment processes a successful payment update.
-func (ps *paymentService) HandleSuccessfulPayment(ctx context.Context, update core.Update) error {
-	// Пример обработки успешной оплаты: логирование и генерация квитанции.
-	ps.logger.Info("Processing successful payment", core.Field{"update_id", update.UpdateID})
-	receipt, err := ps.GenerateReceipt(ctx, "dummy_payment_id") // Здесь вместо "dummy_payment_id" используйте реальный идентификатор платежа
-	if err != nil {
-		ps.logger.Error("Error generating receipt", core.Field{"error", err})
-		return err
-	}
-	ps.logger.Info("Receipt generated", core.Field{"receipt", receipt})
-	return nil
-}
-
-// ProcessRefund processes a refund for a given payment ID.
-func (ps *paymentService) ProcessRefund(ctx context.Context, paymentID string) error {
-	ps.logger.Info("Processing refund", core.Field{"payment_id", paymentID})
-	// Здесь должна быть логика обращения к API платежного провайдера для возврата.
-	// Для примера возвращаем nil.
-	return nil
-}
-
-// GenerateReceipt generates a receipt for the given payment ID.
-func (ps *paymentService) GenerateReceipt(ctx context.Context, paymentID string) (string, error) {
-	// Пример: генерируем квитанцию в виде строки с текущей датой.
-	receipt := fmt.Sprintf("Receipt for payment: %s at %s", paymentID, time.Now().Format(time.RFC3339))
-	ps.logger.Info("Generated receipt", core.Field{"payment_id", paymentID})
-	return receipt, nil
-}
-
