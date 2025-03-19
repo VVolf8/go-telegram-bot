@@ -122,12 +122,12 @@ func (r *simpleRouter) Route(update Update) error {
 					err = handler(update)
 				})
 				if err != nil {
-					r.logger.Error("Error handling command", core.Field{"command", text}, core.Field{"error", err})
+					r.logger.Error("Error handling command", Field{"command", text}, Field{"error", err})
 					return err
 				}
-				r.logger.Info("Handled command successfully", core.Field{"command", text})
+				r.logger.Info("Handled command successfully", Field{"command", text})
 			} else {
-				r.logger.Warn("No handler registered for command", core.Field{"command", text})
+				r.logger.Warn("No handler registered for command", Field{"command", text})
 			}
 		} else {
 			// Если сообщение содержит документ
@@ -136,7 +136,7 @@ func (r *simpleRouter) Route(update Update) error {
 					err = r.documentHandler(update)
 				})
 				if err != nil {
-					r.logger.Error("Error handling document", core.Field{"error", err})
+					r.logger.Error("Error handling document", Field{"error", err})
 					return err
 				}
 			} else if update.Message.Animation != nil && r.animationHandler != nil {
@@ -144,12 +144,12 @@ func (r *simpleRouter) Route(update Update) error {
 					err = r.animationHandler(update)
 				})
 				if err != nil {
-					r.logger.Error("Error handling animation", core.Field{"error", err})
+					r.logger.Error("Error handling animation", Field{"error", err})
 					return err
 				}
 			} else {
 				// Обработка других типов сообщений (видео, аудио, контакты, местоположение и т.д.)
-				r.logger.Debug("Received message without specific handler", core.Field{"text", text})
+				r.logger.Debug("Received message without specific handler", Field{"text", text})
 			}
 		}
 	}
