@@ -15,3 +15,14 @@ func WithTimeoutAndCorrelation(parent context.Context, timeout time.Duration) (c
 	}
 	return ctx, cancel
 }
+
+// generateCorrelationID генерирует уникальную строку с использованием crypto/rand.
+func generateCorrelationID() string {
+        b := make([]byte, 16)
+        _, err := rand.Read(b)
+        if err != nil {
+                // На случай ошибки возвращаем фиксированное значение
+                return "unknown-corr-id"
+        }
+        return hex.EncodeToString(b)
+}
