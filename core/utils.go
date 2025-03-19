@@ -2,6 +2,8 @@ package core
 
 import (
 	"context"
+ "crypto/rand"
+ "encoding/hex"
 	"time"
 )
 
