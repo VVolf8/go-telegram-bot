@@ -44,7 +44,7 @@ type PaymentService interface {
 type PaymentServiceExtended interface {
 	PaymentService
 	// HandleSuccessfulPayment обрабатывает обновление об успешной оплате.
-	HandleSuccessfulPayment(ctx context.Context, update Update) error
+	HandleSuccessfulPayment(ctx context.Context, update core.Update) error
 	// ProcessRefund обрабатывает возврат платежа.
 	ProcessRefund(ctx context.Context, paymentID string) error
 	// GenerateReceipt генерирует квитанцию для платежа.
