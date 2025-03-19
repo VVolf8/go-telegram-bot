@@ -339,7 +339,7 @@ func (b *botClient) EditMessageReplyMarkup(ctx context.Context, chatID int64, me
 		return fmt.Errorf("editMessageReplyMarkup failed with status: %s", resp.Status)
 	}
 
-	b.logger.Info("Message reply markup edited successfully", core.Field{"chat_id", chatID}, Field{"message_id", messageID})
+	b.logger.Info("Message reply markup edited successfully", Field{"chat_id", chatID}, Field{"message_id", messageID})
 	return nil
 }
 
