@@ -305,13 +305,13 @@ func (b *botClient) EditMessageReplyMarkup(ctx context.Context, chatID int64, me
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		b.logger.Error("Failed to marshal editMessageReplyMarkup payload", core.Field{"error", err})
+		b.logger.Error("Failed to marshal editMessageReplyMarkup payload", Field{"error", err})
 		return err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", endpoint, bytes.NewBuffer(body))
 	if err != nil {
-		b.logger.Error("Failed to create editMessageReplyMarkup request", core.Field{"error", err})
+		b.logger.Error("Failed to create editMessageReplyMarkup request", Field{"error", err})
 		return err
 	}
 	req.Header.Set("Content-Type", "application/json")
@@ -321,25 +321,25 @@ func (b *botClient) EditMessageReplyMarkup(ctx context.Context, chatID int64, me
 		resp, err = b.httpClient.Do(req)
 	})
 	if err != nil {
-		b.logger.Error("Error executing editMessageReplyMarkup request", core.Field{"error", err})
+		b.logger.Error("Error executing editMessageReplyMarkup request", Field{"error", err})
 		return err
 	}
 	defer resp.Body.Close()
 
 	respBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		b.logger.Error("Error reading editMessageReplyMarkup response", core.Field{"error", err})
+		b.logger.Error("Error reading editMessageReplyMarkup response", Field{"error", err})
 		return err
 	}
 	if resp.StatusCode != http.StatusOK {
 		b.logger.Error("Non-OK response from editMessageReplyMarkup",
-			core.Field{"status", resp.Status},
-			core.Field{"body", string(respBody)},
+		 Field{"status", resp.Status},
+			Field{"body", string(respBody)},
 		)
 		return fmt.Errorf("editMessageReplyMarkup failed with status: %s", resp.Status)
 	}
 
-	b.logger.Info("Message reply markup edited successfully", core.Field{"chat_id", chatID}, core.Field{"message_id", messageID})
+	b.logger.Info("Message reply markup edited successfully", core.Field{"chat_id", chatID}, Field{"message_id", messageID})
 	return nil
 }
 
