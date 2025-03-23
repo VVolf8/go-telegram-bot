@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"go-telegram-bot/core"
+	"github.com/VVolf8/go-telegram-bot/core"
 )
 
 // InlineKeyboardButton описывает кнопку для inline клавиатуры.
